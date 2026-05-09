@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AquaBot — AI Weather & Satellite Insights</title>
+  <meta name="description" content="Get AI-powered weather summaries, farming tips, and health advice for any city — powered by Open-Meteo and HuggingFace." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ░░ CINEMATIC SPLASH SCREEN ░░ -->
+  <div id="splashScreen" class="splash-screen" aria-hidden="true">
+    <div class="splash-particles" id="splashParticles"></div>
+    <div class="splash-content">
+      <div class="splash-icon-ring">
+        <i data-lucide="satellite" class="splash-logo-icon"></i>
+      </div>
+      <div class="splash-logo-text">AquaBot</div>
+      <p class="splash-tagline">Initializing Satellite Uplink...</p>
+      <div class="splash-progress">
+        <div class="splash-progress-bar"></div>
+      </div>
+    </div>
+    <div class="splash-grid-overlay"></div>
+  </div>
+
+  <!-- ░░ ANIMATED BACKGROUND ░░ -->
+  <div class="bg-wrapper" aria-hidden="true">
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+    <div class="bg-blob blob-3"></div>
+    <div class="bg-grid"></div>
+    <div id="map" class="bg-map"></div>
+  </div>
+
+  <!-- ░░ MAIN APP ░░ -->
+  <div class="container" id="mainContainer">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon-wrap">
+          <i data-lucide="droplets" class="logo-icon"></i>
+        </div>
+        <h1 class="logo-text">AquaBot</h1>
+      </div>
+      <p class="tagline">AI-Powered Weather &amp; Satellite Insights</p>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section glass-card" aria-label="Location search">
+      <div class="search-row">
+        <div class="input-wrap" role="search">
+          <i data-lucide="map-pin" class="input-icon"></i>
+          <input
+            id="cityInput"
+            type="text"
+            placeholder="Enter location (e.g. village, city, district…)"
+            autocomplete="off"
+            aria-label="Location name"
+          />
+        </div>
+        <button id="geoBtn" class="btn-secondary" title="Use my location" aria-label="Use my current location">
+          <i data-lucide="navigation-2"></i>
+        </button>
+        <button id="searchBtn" class="btn-primary" aria-label="Search weather">
+          <i data-lucide="search"></i>
+          <span>Get Insights</span>
+        </button>
+      </div>
+      <div id="errorMsg" class="error-msg hidden" role="alert"></div>
+    </section>
+
+    <!-- Skeleton Loader -->
+    <div id="skeleton" class="hidden" aria-live="polite" aria-label="Loading weather data">
+      <div class="skeleton-card glass-card">
+        <div class="sk-header">
+          <div class="sk-line sk-title"></div>
+          <div class="sk-circle"></div>
+        </div>
+        <div class="sk-temp"></div>
+        <div class="sk-grid">
+          <div class="sk-box"></div><div class="sk-box"></div>
+          <div class="sk-box"></div><div class="sk-box"></div>
+        </div>
+      </div>
+      <div class="skeleton-card glass-card sk-forecast-row">
+        <div class="sk-line sk-title" style="width:40%"></div>
+        <div class="sk-forecast-strip">
+          <div class="sk-fc"></div><div class="sk-fc"></div><div class="sk-fc"></div>
+          <div class="sk-fc"></div><div class="sk-fc"></div><div class="sk-fc"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results" class="hidden">
+
+      <!-- Current Weather Card -->
+      <section class="weather-card glass-card card-3d" id="weatherCard" aria-label="Current weather">
+        <div class="weather-header">
+          <div class="weather-info">
+            <h2 id="cityName" class="city-name"></h2>
+            <p id="weatherDesc" class="weather-desc"></p>
+            <p id="lastUpdated" class="last-updated"></p>
+          </div>
+          <div id="weatherIcon" class="weather-icon-wrap" aria-hidden="true"></div>
+        </div>
+
+        <div class="temp-row">
+          <span id="tempMain" class="temp-main"></span>
+          <div class="temp-meta">
+            <span id="feelsLike" class="feels-like"></span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-chip glass-chip" title="Relative Humidity">
+            <i data-lucide="droplet" class="stat-icon"></i>
+            <span class="stat-label">Humidity</span>
+            <span id="humidity" class="stat-value"></span>
+          </div>
+          <div class="stat-chip glass-chip" title="Wind Speed">
+            <i data-lucide="wind" class="stat-icon"></i>
+            <span class="stat-label">Wind</span>
+            <span id="wind" class="stat-value"></span>
+          </div>
+          <div class="stat-chip glass-chip" title="UV Index">
+            <i data-lucide="sun" class="stat-icon stat-icon--sun"></i>
+            <span class="stat-label">UV Index</span>
+            <span id="uv" class="stat-value"></span>
+          </div>
+          <div class="stat-chip glass-chip" title="Precipitation">
+            <i data-lucide="cloud-rain" class="stat-icon stat-icon--rain"></i>
+            <span class="stat-label">Rainfall</span>
+            <span id="rain" class="stat-value"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7-Day Forecast -->
+      <section class="forecast-section glass-card" aria-label="7-day forecast">
+        <div class="section-header">
+          <h3 class="section-title">
+            <i data-lucide="calendar-days" class="inline-icon"></i>
+            7-Day Forecast
+          </h3>
+        </div>
+        <div id="forecastStrip" class="forecast-strip" role="list"></div>
+      </section>
+
+      <!-- Alert Banner -->
+      <div id="alertBanner" class="alert-banner hidden" role="alert" aria-live="assertive"></div>
+
+      <!-- AI Insights Section -->
+      <section class="insights-section" aria-label="AI generated insights">
+
+        <!-- AI Summary Card -->
+        <div class="insight-card glass-card card-3d" id="summaryCard">
+          <div class="insight-header">
+            <span class="insight-badge">
+              <i data-lucide="sparkles" class="inline-icon-small"></i>
+              AI Summary
+            </span>
+            <span class="powered-by" id="modelLabel">Powered by Qwen-2.5</span>
+          </div>
+          <p id="aiSummary" class="ai-summary-text"></p>
+        </div>
+
+        <!-- Tips Row -->
+        <div class="tips-row">
+          <div class="tip-card glass-card card-3d farming-card">
+            <h3 class="tip-title tip-title--farm">
+              <i data-lucide="leaf" class="inline-icon"></i>
+              Farming Tips
+            </h3>
+            <ul id="farmingTips" class="tips-list"></ul>
+          </div>
+          <div class="tip-card glass-card card-3d health-card">
+            <h3 class="tip-title tip-title--health">
+              <i data-lucide="heart-pulse" class="inline-icon"></i>
+              Health Tips
+            </h3>
+            <ul id="healthTips" class="tips-list"></ul>
+          </div>
+        </div>
+
+      </section>
+    </div><!-- /results -->
+
+    <footer class="footer">
+      <p>
+        <i data-lucide="database" class="inline-icon-small"></i>
+        Weather: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>
+        &nbsp;·&nbsp;
+        <i data-lucide="cpu" class="inline-icon-small"></i>
+        AI: <a href="https://huggingface.co" target="_blank" rel="noopener">HuggingFace</a>
+      </p>
+      <p class="disclaimer">AI tips are informational only. Always consult professionals for critical decisions.</p>
+    </footer>
+
+  </div><!-- /container -->
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
